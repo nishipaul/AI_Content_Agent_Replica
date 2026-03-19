@@ -1,0 +1,21 @@
+# Flake8 config for linting (used by pre-commit).
+# https://flake8.pycqa.org/en/latest/user/configuration.html
+
+[flake8]
+max-line-length = 88
+extend-ignore = E203, E501, F401, W503
+per-file-ignores =
+    src/agent/api/__init__.py:E402
+    src/agent/api/routes.py:E402
+    src/agent/config/write_prompts_to_langfuse.py:E402
+    src/agent/main.py:E402
+    scripts/test_survey_summary_rest.py:E402
+    scripts/test_survey_summary_ws.py:E402
+exclude =
+    .git,
+    __pycache__,
+    .venv,
+    venv,
+    build,
+    dist,
+    *.egg-info

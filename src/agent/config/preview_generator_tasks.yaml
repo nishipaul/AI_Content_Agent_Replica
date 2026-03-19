@@ -1,0 +1,12 @@
+preview_generation_task:
+  description: >
+    Generate an engaging preview summary of the newsletter content.
+    Content: {content}
+    User Prompt: {user_prompt}
+    Current Preview: {current_preview}
+    Output Language: {output_language}
+
+    Create a 15 words (+/- 5 words) summary preview. Make it interesting and engaging.
+    Leverage the user prompt if provided.
+  expected_output: PreviewPayload
+  agent: preview_generator

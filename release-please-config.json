@@ -1,0 +1,15 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "packages": {
+    ".": {
+      "release-type": "simple",
+      "extra-files": [
+        {
+          "type": "yaml",
+          "path": "master_config.yaml",
+          "jsonpath": "$.agent_registry_config.version"
+        }
+      ]
+    }
+  }
+}

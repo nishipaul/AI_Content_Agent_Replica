@@ -1,0 +1,8 @@
+summarisation_task:
+  description: >
+    Analyze the provided chat messages and generate a concise summary.
+    
+    Chat messages: {messages}
+    Language: {language}
+  expected_output: ChatSummaryPayload
+  agent: chat_summariser

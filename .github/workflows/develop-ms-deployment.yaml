@@ -1,0 +1,37 @@
+name: Microservice Deployment - Non Prod Environment
+run-name: ${{ inputs.environment }} - Deploying ${{ inputs.artifact }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment name'
+        type: choice
+        required: true
+        options:
+        - dev
+        - test
+        - perf
+        - perft
+      branch:
+        description: 'Branch name'
+        type: choice
+        required: true
+        options:
+        - develop
+      artifact:
+        description: 'Artifact Version'
+        type: string
+        required: true
+
+jobs:
+  deploy:
+    if: github.ref_name == 'develop' && github.event_name == 'workflow_dispatch'
+    name: Service Deployment
+    uses: Simpplr/github-shared-library/.github/workflows/service-deploy-buildx.yaml@multiarch
+    with:
+      BRANCH: "${{ inputs.branch }}"
+      ENVIRONMENT: "${{ inputs.environment }}"
+      ARTIFACT: "${{ inputs.artifact }}"
+      TEAM_NAME: "ai-platform"
+    secrets: inherit

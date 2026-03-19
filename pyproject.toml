@@ -1,0 +1,130 @@
+[project]
+name = "ai-content-agent"
+version = "0.1.0"
+description = "AI platform CrewAI boilerplate with survey summary crew and FastAPI"
+authors = [{ name = "Your Name", email = "you@example.com" }]
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "ai-infra-python-sdk-core",
+    "ai-infra-python-sdk-agent-config",
+    "ai-infra-python-sdk-vault",
+    "crewai[azure-ai-inference,tools]==1.10.1",
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "requests>=2.28.0",
+    "python-dotenv>=1.0.0",
+    "pydantic-settings>=2.0.0",
+    "opentelemetry-instrumentation-httpx>=0.43b0,<0.60b1",
+    "opentelemetry-instrumentation-requests>=0.43b0,<0.60b1",
+    "opentelemetry-exporter-otlp>=1.34.0,<1.35",
+    "opentelemetry-instrumentation-fastapi>=0.43b0,<0.60b1",
+    "opentelemetry-semantic-conventions>=0.45.0,<0.60b1",
+    "opentelemetry-api>=1.34.0,<1.35",
+    "opentelemetry-sdk>=1.34.0,<1.35",
+    "redis>=7.1.0",
+    "pytest>=9.0.2",
+    "openinference-instrumentation>=0.1.45",
+    "openinference-instrumentation-crewai>=0.1.21",
+]
+
+# Install SDK subpackages from git (modular SDK from feature/moduler_sdk branch)
+[tool.uv.sources]
+ai-infra-python-sdk-core = { git = "https://github.com/Simpplr/ai-platform-infra-boilerplate.git", branch = "main" }
+ai-infra-python-sdk-agent-config = { git = "https://github.com/Simpplr/ai-platform-infra-boilerplate.git", branch = "main", subdirectory = "packages/ai_infra_python_sdk_agent_config" }
+ai-infra-python-sdk-vault = { git = "https://github.com/Simpplr/ai-platform-infra-boilerplate.git", branch = "main", subdirectory = "packages/ai_infra_python_sdk_vault" }
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "httpx>=0.24.0",
+    "pytest-cov>=4.0.0",
+    "pre-commit>=3.6.0",
+    "flake8>=7.0.0",
+    "mypy>=1.9.0",
+    "black>=24.4.0",
+    "isort>=5.13.0",
+    "types-requests>=2.28.0",
+    "types-PyYAML>=6.0.0",
+]
+
+[project.scripts]
+run_crew = "agent.main:run"
+run_api = "agent.api:run_api_server"
+run_hooks = "agent.main:run_hooks"
+run_prehooks = "agent.main:run_hooks"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agent"]
+
+[tool.crewai]
+type = "crew"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = [
+    "unit: Unit tests for individual components",
+    "integration: Integration tests for component interactions",
+    "api: API tests for FastAPI endpoints",
+    "agent: Tests for CrewAI agents and crews",
+    "e2e: End-to-end full workflow tests (may call real services)",
+]
+addopts = "-v --tb=short"
+filterwarnings = ["ignore::DeprecationWarning", "ignore::SyntaxWarning"]
+
+[tool.coverage.run]
+source = ["src/agent"]
+branch = true
+omit = [
+    "*/tests/*",
+    "*/__init__.py",
+    "*/config/write_prompts_to_langfuse.py",
+    "*/tools/confluence_pages_fetcher_tool.py",
+    "*/tools/confluence_search_and_retrive_tool.py",
+    "*/tools/elastic_search_query_tool.py",
+    "*/tools/slack_tool.py",
+    "*/db_connections/*.py",
+    "*/api/kafka_pipeline.py",  # Integration-heavy; unit tests in test_kafka_pipeline.py
+]
+
+[tool.coverage.report]
+fail_under = 90
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+]
+
+[tool.black]
+line-length = 88
+target-version = ["py312"]
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  \.git
+  | \.venv
+  | venv
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 88
+skip = [".venv", "venv", "build", "dist"]
+known_first_party = ["agent"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+exclude = ["\\.venv/", "venv/", "build/", "dist/"]
+plugins = []

@@ -1,0 +1,32 @@
+name: Build & Deploy - Qa Environment
+run-name: qa & migt - Build & Deploy from ${{ github.ref }}
+
+on:
+  # push:
+  #   branches:
+  #     - hotfix
+  #     - release
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    if: github.ref_name == 'hotfix' || github.ref_name == 'release'
+    name: Service Deployment
+    uses: Simpplr/github-shared-library/.github/workflows/service-deploy-buildx.yaml@multiarch
+    with:
+      BRANCH: "${{ github.ref }}"
+      ENVIRONMENT: "qa"
+      TEAM_NAME: "ai-platform"
+    secrets: inherit
+
+  deploy-migt:
+    if: github.ref_name == 'hotfix' || github.ref_name == 'release'
+    needs: deploy
+    name: Service Deployment to MIGT environment
+    uses: Simpplr/github-shared-library/.github/workflows/service-deploy-buildx.yaml@multiarch
+    with:
+      BRANCH: "${{ github.ref }}"
+      ENVIRONMENT: "migt"
+      TEAM_NAME: "ai-platform"
+      ARTIFACT: "qa-latest"
+    secrets: inherit

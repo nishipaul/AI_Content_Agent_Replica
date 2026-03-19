@@ -1,0 +1,71 @@
+# Pre-commit hooks for code quality and consistency.
+# Local hooks are mandatory: no code may be committed/pushed without passing.
+# Checks: src/agent and tests/ (format, lint, typecheck, coverage).
+#
+# Required one-time setup (after clone):
+#   uv sync --extra dev
+#   uv run pre-commit install
+#   uv run pre-commit install --hook-type pre-push
+# Or: ./scripts/setup_hooks.sh
+#
+# Run manually: make hooks  or  uv run pre-commit run --all-files
+
+repos:
+  # Remove mypy cache so type checking runs with a clean cache
+  - repo: local
+    hooks:
+      - id: remove-mypy-cache
+        name: Remove .mypy_cache
+        entry: bash -c "rm -rf .mypy_cache"
+        language: system
+        pass_filenames: false
+
+      # Enforce test coverage (fail_under from [tool.coverage.report] in pyproject.toml)
+      - id: pytest-coverage
+        name: pytest with coverage (fail under from pyproject)
+        entry: bash -c "ROOT=\"$(git rev-parse --show-toplevel)\" && cd \"$ROOT\" && COVERAGE_FILE=/tmp/.coverage_precommit PYTHONPATH=\"$ROOT/src\" uv run pytest --cov=agent --cov-report=term-missing"
+        language: system
+        pass_filenames: false
+
+  # General hooks (trailing whitespace, end of file, etc.)
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+        exclude: ^src/agent/config/(agents|tasks)\.yaml$
+      - id: check-yaml
+      - id: check-added-large-files
+        args: ["--maxkb=1000"]
+      - id: check-merge-conflict
+      - id: debug-statements
+
+  # Import sorting
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        name: isort
+        args: ["--profile", "black"]
+
+  # Code formatting
+  - repo: https://github.com/psf/black
+    rev: 24.4.2
+    hooks:
+      - id: black
+        language_version: python3.12
+
+  # Linting
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.0.0
+    hooks:
+      - id: flake8
+        args: ["--config", ".flake8"]
+
+  # Type checking
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.9.0
+    hooks:
+      - id: mypy
+        additional_dependencies: [types-requests, types-redis, types-PyYAML]
+        args: ["--config-file", "pyproject.toml"]

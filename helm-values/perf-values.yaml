@@ -1,0 +1,57 @@
+microservicesName:
+  ai-content-agent-app:
+    isHpaEnabled: true
+    autoscalingMinReplicas: 10
+    autoscalingMaxReplicas: 20
+    nodeSelector:
+      label: graviton
+    tolerations:
+      - effect: NoSchedule
+        key: taint
+        operator: Equal
+        value: graviton
+    tolerationsEnabled: true
+    nodeSelectorEnabled: true
+
+ingress:
+  annotations: {}
+  overrideAnnotations:
+    alb.ingress.kubernetes.io/group.name: ingress-perf-2 # using load balancer 2
+    alb.ingress.kubernetes.io/load-balancer-name: ingress-alb-perf-2
+
+#***********************************************************************************************************#
+# ConfigMap Variables #
+# Common configurations across all services included in this repo
+#***********************************************************************************************************#
+
+configMap:
+  data:
+    ENV: perf
+    PORT: "5000"
+    LOG_LEVEL: info
+    ENV_REGION: perf
+
+    # AWS Configuration
+    AWS_SM_REGION: us-west-2
+
+    AGENT_NAME: survey-summary
+
+    ENVIRONMENT: perf
+
+    KAFKA_BOOTSTRAP_ADDRESS: b-1.smplrbasesharedperfkaf.pghydq.c2.kafka.us-west-2.amazonaws.com:9094,b-2.smplrbasesharedperfkaf.pghydq.c2.kafka.us-west-2.amazonaws.com:9094,b-3.smplrbasesharedperfkaf.pghydq.c2.kafka.us-west-2.amazonaws.com:9094
+
+    CONSUMER_TOPIC: Sample_AI_Agent_Topic_Dev
+    PRODUCER_TOPIC: Sample_AI_Agent_Topic_2_Dev
+    KAFKA_GROUP_ID: survey-summary-crew-consumer
+    SECURITY_PROTOCOL: SSL
+    MAX_POLL_INTERVAL_MS: "1000"
+    MAX_POLL_RECORDS: "1"
+
+
+    AWS_SM_VAULT_CONFIG: vault/perf/orion
+    AWS_DEFAULT_REGION: us-west-2
+
+    SQL_VAULT_PATH: services/data/infra/perf/static/db/ai_platform_memory
+    MONGO_VAULT_PATH: services/data/infra/perf/static/mongo_db/ai_platform_memory
+    REDIS_VAULT_PATH: services/data/infra/perf/static/redis/zeus
+    LANGFUSE_VAULT_PATH: services/data/llm-orchestrator/perf/static/key/langfuse-v3

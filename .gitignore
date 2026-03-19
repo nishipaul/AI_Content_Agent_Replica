@@ -1,0 +1,23 @@
+.env
+__pycache__/
+.DS_Store
+.venv/
+
+venv/
+env/
+.env
+.claude/
+
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Never commit secrets / SSH keys
+id_rsa
+id_rsa.pub
+git_ssh_key
+
+.DS_Store

@@ -1,0 +1,19 @@
+name: Daily Deployment Test Environment
+run-name: Daily Deployment Test Environment
+
+on:
+  # schedule:
+  #   - cron: '30 12 * * 1-5' # 6:00 PM IST every weekday
+  workflow_dispatch:
+
+jobs:
+  scheduled-deploy-test:
+    name: Scheduled Service Deployment Test
+    uses: Simpplr/github-shared-library/.github/workflows/service-deploy-buildx.yaml@multiarch
+    with:
+      BRANCH: "develop"
+      ENVIRONMENT: "test"
+      ARTIFACT: "dev-latest"
+      TEAM_NAME: "ai-platform"
+    secrets: inherit
+    if: github.ref_name == 'develop' && github.event_name == 'schedule'

@@ -1,0 +1,44 @@
+name: Microservice Deployment - Prod Environment
+run-name: ${{ inputs.environment }} - Deploying ${{ inputs.artifact }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment name'
+        type: choice
+        required: true
+        options:
+          - qa
+          - migt
+          - uat
+          - prod
+          - prod-eu
+          - uat-eu
+          - uat-ca
+          - uat-au
+          - prod-ca
+          - prod-au
+      branch:
+        description: 'Branch name'
+        type: choice
+        required: true
+        options:
+          - release
+          - hotfix
+      artifact:
+        description: 'Artifact Version'
+        type: string
+        required: true
+
+jobs:
+  deploy:
+    if: github.ref_name == 'hotfix' || github.ref_name == 'release'
+    name: Service Deployment
+    uses: Simpplr/github-shared-library/.github/workflows/service-deploy-buildx.yaml@multiarch
+    with:
+      BRANCH: "${{ inputs.branch }}"
+      ENVIRONMENT: "${{ inputs.environment }}"
+      ARTIFACT: "${{ inputs.artifact }}"
+      TEAM_NAME: "ai-platform"
+    secrets: inherit

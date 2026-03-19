@@ -1,0 +1,64 @@
+name: Test & Lint Check
+
+on:
+  # push:
+  #   branches: [develop]
+  #   paths:
+  #     - 'services/**'
+  #     - 'packages/**'
+  #     - 'package.json'
+  #     - 'package-lock.json'
+  #     - 'turbo.json'
+  #     - '.github/workflows/pull_request_test_workflow.yml'
+  # pull_request:
+  #   types: [opened, synchronize, reopened]
+  #   paths:
+  #     - 'services/**'
+  #     - 'packages/**'
+  #     - 'package.json'
+  #     - 'package-lock.json'
+  #     - 'turbo.json'
+  #     - '.github/workflows/pull_request_test_workflow.yml'
+
+env:
+  SIMPPLR_NPM_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  build-lint-typecheck-test:
+    runs-on: kubernetes
+
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v3
+
+      - name: Set node version
+        uses: actions/setup-node@v3
+        with:
+          node-version-file: '.node-version'
+          cache: 'npm'
+
+      - name: Install modules on root
+        run: npm --version && npm ci
+        env:
+          SIMPPLR_NPM_TOKEN: ${{ secrets.SIMPPLR_NPM_TOKEN }}
+
+      - name: Build all packages
+        run: npm run build
+        env:
+          SIMPPLR_NPM_TOKEN: ${{ secrets.SIMPPLR_NPM_TOKEN }}
+
+      - name: Run lint on all packages
+        run: npm run lint
+        env:
+          SIMPPLR_NPM_TOKEN: ${{ secrets.SIMPPLR_NPM_TOKEN }}
+
+      - name: Run tests with coverage on all packages
+        run: npm run test:cov
+        env:
+          SIMPPLR_NPM_TOKEN: ${{ secrets.SIMPPLR_NPM_TOKEN }}
+
+      # - name: '🛠 SonarQube Analysis'
+      #   uses: sonarsource/sonarqube-scan-action@master
+      #   env:
+      #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      #     SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}

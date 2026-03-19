@@ -1,0 +1,2 @@
+# Regenerate test_reports.md on merge (no conflict markers). Driver is registered by make setup-hooks.
+test_reports.md merge=regenerate-test-report

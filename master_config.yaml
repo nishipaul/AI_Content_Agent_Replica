@@ -1,0 +1,113 @@
+## all the agent registry configurations are defined here
+agent_registry_config:
+  agent_id: ai-content-agent
+  name: Ai Content Agent
+  description: Ai Content Agent agent powered by AI Infra SDK
+  version: 1.0.0
+  pattern: Single Agent
+  framework: CrewAI
+  tags:
+    - ai-content-agent
+  category: platform_services
+  status: development
+
+  owner:
+    team: AI Platform
+    contact: AI Platform@simpplr.com
+    slack_channel: "#AI Platform-support"
+    github_repo: https://github.com/Simpplr/ai-content-agent
+
+  capabilities:
+    - ai-content-agent
+
+  endpoints:
+    dev: https://api-be-2.dev.simpplr.xyz/v1/ai-content-agent
+
+  reusable: true
+  tools:
+    - custom
+  memory_config:
+    short_term: false
+    long_term: false
+    contextual: false
+
+
+
+## all the runtime configurations for the agent are defined here
+agent_runtime_config:
+  endpoints:
+    rest_api_enabled: true
+    kafka_enabled: false
+    websocket_enabled: false
+
+  databases:
+    mongo_enabled: false
+    redis_enabled: false
+    sql_enabled: false
+
+  memory:
+    short_term: false
+
+  prompt_management:
+    enabled: false
+
+
+
+
+### All the prompts for the agents and tasks and their versions are defined here
+agent_prompt_config:
+  Agents:
+    - chat_summariser:
+        name: ai_content_agent_prompts
+        Labels:
+          - agent_chat_summariser
+        Version:
+          - v1
+        Tags:
+          - agent_chat_summariser
+    
+    - title_generator:
+        name: ai_content_agent_prompts
+        Labels:
+          - agent_title_generator
+        Version:
+          - v1
+        Tags:
+          - agent_title_generator
+
+    - preview_generator:
+        name: ai_content_agent_prompts
+        Labels:
+          - agent_preview_generator
+        Version:
+          - v1
+        Tags:
+          - agent_preview_generator
+          
+  Tasks:
+    - chat_summarisation_task:
+        name: ai_content_agent_prompts
+        Labels:
+          - task_chat_summarisation_task
+        Version:
+          - v1
+        Tags:
+          - task_chat_summarisation_task
+
+    - title_generation_task:
+        name: ai_content_agent_prompts
+        Labels:
+          - task_title_generation_task
+        Version:
+          - v1
+        Tags:
+          - task_title_generation_task
+
+    - preview_generation_task:
+        name: ai_content_agent_prompts
+        Labels:
+          - task_preview_generation_task
+        Version:
+          - v1
+        Tags:
+          - task_preview_generation_task

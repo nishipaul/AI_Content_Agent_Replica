@@ -1,0 +1,71 @@
+name: Agent Registration
+
+on:
+  # push:
+  #   paths:
+  #     - 'master_config.yaml'
+  workflow_dispatch: # Allows manual triggering
+    inputs:
+      environment:
+        description: 'Environment name'
+        type: choice
+        required: true
+        options:
+          - dev
+          # - test
+
+jobs:
+  post-config:
+    runs-on: kubernetes
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set registry domain by environment
+        run: |
+          case "${{ inputs.environment }}" in
+            dev)  echo "REGISTRY_DOMAIN=https://api-be-2.dev.simpplr.xyz" ;;
+            test) echo "REGISTRY_DOMAIN=https://api-be-2.test.simpplr.xyz" ;;
+            *)    echo "REGISTRY_DOMAIN=https://api-be-2.dev.simpplr.xyz" ;;
+          esac >> $GITHUB_ENV
+
+      - name: Validate Config
+        id: validate
+        run: |
+          # 1. Check if file exists
+          if [ ! -f master_config.yaml ]; then
+            echo "::error::master_config.yaml not found!"
+            exit 1
+          fi
+
+          # 2. Check if agent_registry_config key exists and is not empty
+          # We use yq (pre-installed) to extract the specific block and convert to JSON
+          PAYLOAD=$(yq eval -o=json '.agent_registry_config' master_config.yaml)
+
+          if [ "$PAYLOAD" == "null" ] || [ -z "$PAYLOAD" ]; then
+            echo "::error::agent_registry_config is missing or empty in master_config.yaml"
+            exit 1
+          fi
+
+          # 3. (Optional) Add more checks here, e.g., check for mandatory fields like 'id'
+          ID_CHECK=$(yq eval '.agent_registry_config.agent_id' master_config.yaml)
+          if [ "$ID_CHECK" == "null" ]; then
+            echo "::error::Config is missing the mandatory 'id' field"
+            exit 1
+          fi
+          echo "payload<<EOF" >> $GITHUB_OUTPUT
+          echo "$PAYLOAD" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: POST to API
+        uses: fjogeleit/http-request-action@v1
+        with:
+          url: '${{ env.REGISTRY_DOMAIN }}/v1/agent-registry/register'
+          method: 'POST'
+          # We extract only the agent_registry_config part of the JSON
+          # data: ${{ toJson(fromJSON(steps.validate.outputs.payload).agent_registry_config) }}
+          data: ${{ steps.validate.outputs.payload }}
+          customHeaders: '{"Content-Type": "application/json"}'
+          # Optional: Use secrets for authentication
+          # bearerToken: ${{ secrets.API_TOKEN }}

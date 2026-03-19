@@ -1,0 +1,55 @@
+# Git
+.git
+.gitignore
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv
+venv
+env
+.eggs
+*.egg-info
+*.egg
+
+# Testing and linting
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.coverage
+htmlcov
+.tox
+
+# IDE and OS
+.idea
+.vscode
+.cursor
+.DS_Store
+*.swp
+*.swo
+
+# Jupyter
+.ipynb_checkpoints
+*.ipynb
+
+# Secrets / SSH
+id_rsa
+id_rsa.pub
+git_ssh_key
+
+# Documentation and dev scripts (optional: remove if you want them in the image)
+# README.md
+# sample_curl.sh
+
+# Docker
+Dockerfile
+.dockerignore

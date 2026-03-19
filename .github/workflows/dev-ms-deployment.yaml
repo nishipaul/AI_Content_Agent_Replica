@@ -1,0 +1,19 @@
+name: Build & Deploy - Dev Environment
+run-name: dev - Build & Deploy from ${{ github.ref }}
+
+on:
+  # push:
+  #   branches:
+  #     - develop
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    if: github.ref_name == 'develop'
+    name: Service Deployment
+    uses: Simpplr/github-shared-library/.github/workflows/service-deploy-buildx.yaml@multiarch
+    with:
+      BRANCH: "${{ github.ref }}"
+      ENVIRONMENT: "dev"
+      TEAM_NAME: "ai-platform"
+    secrets: inherit

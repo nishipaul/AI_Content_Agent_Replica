@@ -1,0 +1,121 @@
+# Default values for job-orchestrator microservice-deploy.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+#***********************************************************************************************************#
+# Below Values are required for jenkins shared lib #
+#***********************************************************************************************************#
+
+# this name will be used to deploy helm chart and dbupgrade part
+serviceName: 'ai-content-agent' # This name must be same as dbUpgrade s3 path.
+modifiedServiceName: 'ai-content-agent' # This required by ArgoCD
+
+# Sub-microservice root path - this is needed to UT and trivy
+# SubMicroserviceRootPaths: 'services/job-orchestrator-mgmt-app,services/job-orchestrator-private-event-daemon,services/job-orchestrator-public-event-daemon,services/job-orchestrator-worker-node'
+
+### ***** Below are the optional values ****** ###
+
+# Uncomment below lines if you don't want to perform DB Upgrade
+IsDbUpgradeEnabled: "false" # OPTIONAL
+isPrismaMigrationEnabled: "false"
+prismaMigrationsFolder: "db-upgrade"
+
+# Uncomment below lines if you don't want to perform code and images scan using trivy
+trivyScan: "false" # OPTIONAL
+
+# Uncomment below lines if you don't want to perform listing
+#IsLintEnabled: "false" # OPTIONAL
+
+## Uncomment below lines if you don't want to perform unit test
+IsUtEnabled: "false" # OPTIONAL
+
+#***********************************************************************************************************#
+# Common Deployment Variables #
+#***********************************************************************************************************#
+
+#NOTE: SubmicroserviceName and labels's name must be same.
+
+# Details of all sub-microservices
+microservicesName: # Job Orchestrator microservices for core-platform team
+  ai-content-agent-app: # Job Management REST API Service
+    isServiceEnabled: true # value would be true if you want to create service against this deployment
+    isOTELEnabled: true
+    serviceName: 'ai-content-agent-service' # Service Name
+    isHpaEnabled: true # Keep it as it is, this will be replaced from jenkins
+    name: 'ai-content-agent-app'
+    labels:
+      name: 'ai-content-agent-app'
+      team: 'ai-platform'
+    repo: 'ai-content-agent-app' # ECR Repo Name
+    dockerFileLocation: './' # Docker File Location
+    startUpProbe:
+      create: true
+      path: /startUpProbe
+      initialDelaySeconds: 10
+      periodSeconds: 5
+      failureThreshold: 10
+      timeoutSeconds: 4
+      successThreshold: 1
+    readinessProbe:
+      create: true
+      path: /readinessProbe
+      initialDelaySeconds: 1
+      periodSeconds: 5
+      failureThreshold: 2
+      timeoutSeconds: 4
+      successThreshold: 1
+    livenessProbe:
+      create: true
+      path: /livenessProbe
+      initialDelaySeconds: 5
+      periodSeconds: 5
+      failureThreshold: 2
+      timeoutSeconds: 4
+      successThreshold: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 300Mi
+      limits:
+        cpu: 150m
+        memory: 350Mi
+
+extraVolumes:
+  # IMPORTANT: These volumes MUST be configured as emptyDir type in the helm template
+  # to be writable with readOnlyRootFilesystem: true
+  # The template should have: volumes: [{ name: "crewai-data", emptyDir: {} }, ...]
+  - name: crewai-data
+    path: /app/.local
+  - name: crewai-cache
+    path: /app/.cache
+  - name: crewai-config
+    path: /app/.config
+  # Mount /tmp as writable volume for CrewAI temp files
+  - name: tmp-volume
+    path: /tmp
+
+# HealthCheck path
+startUpProbe:
+  create: true
+  path: /startUpProbe
+
+livenessProbe:
+  create: true
+  path: /livenessProbe
+
+readinessProbe:
+  create: true
+  path: /readinessProbe
+
+#***********************************************************************************************************#
+# Ingress Variables #
+#***********************************************************************************************************#
+
+ingress:
+  className: ''
+  paths:
+    - path: /v1/ai-content-agent
+      pathType: ImplementationSpecific #NOTE: Please use 'ImplementationSpecific' for wildcard path like - /v1/content/* and 'Prefix' for without wildcard path like- /v1/content/ in pathType
+      serviceName: ai-content-agent-service # use serviceName for which you want to created ingress resource.
+    - path: /v1/ai-content-agent/*
+      pathType: ImplementationSpecific #NOTE: Please use 'ImplementationSpecific' for wildcard path like - /v1/content/* and 'Prefix' for without wildcard path like- /v1/content/ in pathType
+      serviceName: ai-content-agent-service # use serviceName for which you want to created ingress resource.

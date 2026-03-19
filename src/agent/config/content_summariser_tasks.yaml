@@ -1,0 +1,12 @@
+content_summarisation_task:
+  description: >
+    Summarize the provided blog/page content according to the specified mode.
+    
+    Content: {content}
+    Mode: {mode}
+    Company Name: {company_name}
+    Industry: {industry}
+    Company Description: {company_description}
+    Output Language: {output_language}
+  expected_output: ContentSummaryPayload
+  agent: content_summariser

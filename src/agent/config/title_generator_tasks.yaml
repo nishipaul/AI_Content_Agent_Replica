@@ -1,0 +1,12 @@
+title_generation_task:
+  description: >
+    Generate a clear, informative title based on the provided content.
+    Content: {content}
+    User Prompt: {user_prompt}
+    Current Title: {current_title}
+    Output Language: {output_language}
+
+    Modify the title based on the user prompt if provided. Preserve any placeholders present in the original content.
+    Include dates only if essential. No trailing punctuation. Avoid clickbait.
+  expected_output: TitlePayload
+  agent: title_generator
