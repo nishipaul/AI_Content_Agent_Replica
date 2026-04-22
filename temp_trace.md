@@ -1,12 +1,20 @@
-# Tracing Migration: simpplr-agents → ai-platform-infra-sdk
+# Tracing migration architecture
 
-## Problem
+**Summary:** We're consolidating duplicated tracing logic into **ai-platform-infra-sdk** (`simpplr_tracing` and core observability modules) so **simpplr-agents** stays a thin FastAPI/CrewAI shell. New agent services import one SDK instead of copying `trace_utils`, LLM gateway tracing, and OTEL setup.
 
-Tracing code is duplicated across `simpplr-agents` and `ai-platform-infra-sdk`. Functions like `build_trace_tags` have diverged. Mandatory tracing logic (LLM spans, config-fetch spans, gateway client) lives in the app layer instead of the SDK, forcing every new service to copy-paste.
+**Last updated:** 2026-04-22
 
 ---
 
-## Current State
+## Why we're doing this
+
+Tracing code exists in two places today: the SDK and simpplr-agents. `build_trace_tags` and related helpers have **diverged** (different tag string formats and fields). Mandatory pieces—LLM gateway spans (`GatewayHttpxClient`), trace tag construction, and Langfuse/OTEL bootstrap—live in the app repo, so every new service tends to copy-paste rather than reuse.
+
+The goal is a **single source of truth** in the SDK, **additive** public APIs for extensions (`trace_external_call`, decorators, gateway client), and **thin shims** in simpplr-agents until callers migrate imports.
+
+---
+
+## Current state
 
 ```mermaid
 graph LR
@@ -15,48 +23,51 @@ graph LR
     CoreObs["ai_infra.observability.pipeline"]
   end
 
-  subgraph SA["simpplr-agents (heavy)"]
-    TU["trace_utils.py ⚠️ DUPLICATE"]
+  subgraph SA["simpplr-agents"]
+    TU["trace_utils.py — DUPLICATE"]
     LRT["llm_request_tracing.py"]
-    TR["tracing.py (setup)"]
-    PL["pipeline.py (662 lines)"]
+    TR["tracing.py — setup"]
+    PL["pipeline.py"]
   end
 
   ST -->|"trace_llm, trace_external_call"| PL
   ST -->|"constants"| LRT
-  TU -->|"build_trace_tags (diverged)"| PL
+  TU -->|"build_trace_tags — diverged"| PL
   LRT -->|"GatewayHttpxClient"| PL
   TR -->|"setup_tracing()"| PL
 ```
 
-**Key issues:**
-- `trace_utils.py` exists in both repos; `build_trace_tags` signatures and output formats differ
-- `GatewayHttpxClient` (mandatory for LLM tracing) is stuck inside simpplr-agents
-- `setup_tracing()` is not reusable by other services
-- End users cannot import LLM tracing helpers from the SDK
+**Problems:**
+
+| Issue | Impact |
+|-------|--------|
+| Two `trace_utils` implementations | Different `build_trace_tags` signatures and tag formats (`key : value` vs enriched `x-smtip-key:value`). |
+| `GatewayHttpxClient` only in agents | Mandatory LLM tracing cannot be imported from the SDK. |
+| `setup_tracing()` only in agents | Same bootstrap copied or forked per service. |
+| Heavy `pipeline.py` in agents | Large FastAPI/DI surface that should converge with SDK `observability.pipeline`. |
 
 ---
 
-## Target State
+## Target state
 
 ```mermaid
 graph TB
-  subgraph SDK["ai-platform-infra-sdk (single source of truth)"]
+  subgraph SDK["ai-platform-infra-sdk — single source of truth"]
     subgraph ST["simpplr_tracing"]
       TL["trace_llm()"]
       TEC["trace_external_call()"]
-      TU2["trace_utils\nbuild_trace_tags\nbuild_trace_metadata\nbuild_outcome_metadata\nmerge/dedup helpers"]
-      LCT["llm_client_tracing ← NEW\nGatewayHttpxClient\nLLMRequestTraceScope\nset/get/reset scope"]
-      AS["agent_setup ← NEW\nsetup_agent_tracing()"]
+      TU2["trace_utils — build_trace_tags,<br/>metadata helpers, merge/dedup"]
+      LCT["llm_client_tracing — NEW<br/>GatewayHttpxClient, scope helpers"]
+      AS["agent_setup — NEW<br/>setup_agent_tracing()"]
     end
 
     subgraph Core["ai_infra_python_sdk_core"]
-      PD["observability.pipeline\ntracing_agents\ntrace_ai_config\ntrace_prompt_sync"]
+      PD["observability.pipeline —<br/>tracing_agents, trace_ai_config,<br/>trace_prompt_sync, …"]
       BC["base_crew.run_with_tracing"]
     end
   end
 
-  subgraph SA["simpplr-agents (thin)"]
+  subgraph SA["simpplr-agents — thin"]
     R["routes.py"]
     RS["resources.py"]
     CE["crew_executor.py"]
@@ -71,10 +82,10 @@ graph TB
   AS --> RS
   BC --> CE
 
-  subgraph UE["End-User Extension"]
-    U1["trace_external_call() → custom APIs"]
-    U2["GatewayHttpxClient → custom LLM clients"]
-    U3["tracing_agents decorator → custom routes"]
+  subgraph UE["Downstream extension"]
+    U1["trace_external_call — custom APIs"]
+    U2["GatewayHttpxClient — custom LLM stacks"]
+    U3["Pipeline decorators — custom routes"]
   end
 
   TEC -.-> U1
@@ -82,83 +93,95 @@ graph TB
   PD -.-> U3
 ```
 
+**Intent:**
+
+- **`simpplr_tracing.trace_utils`** owns the enriched SMTIP tag format and dedup helpers (`parse_trace_tag_pair`, `merge_trace_tags_without_duplicate_semantics`, etc.).
+- **`simpplr_tracing.llm_client_tracing`** owns gateway HTTPX wrapping and request trace scope (no dependency on agents-specific types).
+- **`simpplr_tracing.agent_setup`** exposes parameterized `setup_agent_tracing(service_name, …)` instead of a agents-local `setup_tracing()`.
+- **simpplr-agents** keeps app wiring only: routes, resources lifecycle, crew execution quirks, `app.py`.
+
 ---
 
-## What Moves vs. What Stays
+## What moves vs. what stays
 
-### Moves to SDK
+### Moves into the SDK
 
-| Code | From | To (SDK) | Why |
-|------|------|----------|-----|
-| `build_trace_tags` (enriched) | `simpplr-agents/trace_utils.py` | `simpplr_tracing.trace_utils` | Eliminate divergence, single format |
-| Tag dedup helpers | `simpplr-agents/trace_utils.py` | `simpplr_tracing.trace_utils` | Generic, reusable |
-| `GatewayHttpxClient` + scope | `simpplr-agents/llm_request_tracing.py` | `simpplr_tracing.llm_client_tracing` | Mandatory for every agent service |
-| `setup_tracing()` | `simpplr-agents/tracing.py` | `simpplr_tracing.agent_setup` | Identical init across all services |
+| Code | From | To | Rationale |
+|------|------|-----|-----------|
+| Enriched `build_trace_tags`, dedup helpers | `simpplr-agents/.../trace_utils.py` | `simpplr_tracing.trace_utils` | One format (`x-smtip-*:value` taxonomy aligned with headers and tests). |
+| `GatewayHttpxClient`, `LLMRequestTraceScope`, scope setters | `simpplr-agents/llm_request_tracing.py` | `simpplr_tracing.llm_client_tracing` | Required for every agent that calls the LLM gateway. |
+| `setup_tracing()` | `simpplr-agents/tracing.py` | `simpplr_tracing.agent_setup` as `setup_agent_tracing(...)` | Shared OTEL + Langfuse + CrewAI init. |
+
+Functions already in the SDK (`trace_llm`, `trace_external_call`, pipeline decorators in `ai_infra.observability.pipeline`) stay there; simpplr-agents continues to consume them via imports, not forks.
 
 ### Stays in simpplr-agents
 
-| Code | Why |
+| Area | Why |
 |------|-----|
-| `routes.py`, `app.py` | App-specific wiring |
-| `crew_executor.py`, `langfuse_retry.py` | App-specific retry/error handling |
-| `resources.py` (startup lifecycle) | App-specific resource management |
+| `routes.py`, `app.py` | Route registration, middleware order, service-specific DI. |
+| `resources.py` | Startup/shutdown and resource lifecycle for this app. |
+| `crew_executor.py`, `langfuse_retry.py` | Retry and execution behavior specific to simpplr-agents. |
+
+After migration, optional **re-export shims** (thin modules that re-import from the SDK) can preserve old import paths for a deprecation window.
 
 ---
 
-## Migration Phases
+## Migration phases
+
+Phases are ordered to avoid circular imports and to land test coverage with the code.
 
 ```mermaid
 gantt
-  title Migration Phases
+  title Tracing migration — dependency order
   dateFormat X
   axisFormat %s
 
-  section SDK Changes
-  Phase1_ConsolidateTraceUtils :p1, 0, 1
-  Phase2_MoveLlmClientTracing  :p2, after p1, 1
-  Phase3_MoveSetupTracing      :p3, after p1, 1
+  section SDK
+  P1_trace_utils       :p1, 0, 1
+  P2_llm_client        :p2, after p1, 1
+  P3_agent_setup       :p3, after p1, 1
 
   section simpplr-agents
-  Phase4_ThinOut          :p4, after p2, 1
-  Phase5_ExportsAndVersion :p5, after p4, 1
-  Phase6_MigrateTests     :p6, after p5, 1
+  P4_thin_agents       :p4, after p2, 1
+  P5_version_exports   :p5, after p4, 1
+  P6_tests               :p6, after p5, 1
 ```
 
-| Phase | Action | Key Detail |
-|-------|--------|------------|
-| 1 | Consolidate `trace_utils` | Upgrade SDK's `build_trace_tags` to `x-smtip-*:value` format; add `parse_trace_tag_pair`, `merge_trace_tags_without_duplicate_semantics` |
-| 2 | Create `simpplr_tracing.llm_client_tracing` | Move `GatewayHttpxClient`, `LLMRequestTraceScope`; refactor `set_llm_request_trace_scope` to accept **kwargs** instead of `AgentExecutionContext` (avoids circular dep) |
-| 3 | Create `simpplr_tracing.agent_setup` | Move `setup_tracing()` as parameterized `setup_agent_tracing(service_name, ...)` |
-| 4 | Thin out simpplr-agents | Delete `trace_utils.py`; replace `llm_request_tracing.py` and `tracing.py` with thin re-imports |
-| 5 | Version bump | `simpplr-python-tracing` 2.5.0 → 2.6.0; update `simpplr-agents` pin |
-| 6 | Move tests | `test_llm_request_tracing.py`, `test_tracing_init.py` → SDK test suite |
+| Phase | Work | Notes |
+|-------|------|--------|
+| **1** | Consolidate `trace_utils` in the SDK | Align `build_trace_tags` with enriched `x-smtip-*` strings; add `parse_trace_tag_pair`, `merge_trace_tags_without_duplicate_semantics`, and related helpers from agents. |
+| **2** | Add `simpplr_tracing.llm_client_tracing` | Move `GatewayHttpxClient` and `LLMRequestTraceScope`; implement `set_llm_request_trace_scope` with **keyword arguments** instead of `AgentExecutionContext` to avoid SDK ↔ runtime cycles. |
+| **3** | Add `simpplr_tracing.agent_setup` | Move setup as `setup_agent_tracing(service_name, …)` with env-driven config. |
+| **4** | Thin simpplr-agents | Remove duplicate `trace_utils.py`; replace `llm_request_tracing.py` and `tracing.py` with thin imports (or shims). |
+| **5** | Versioning and exports | Bump `simpplr-python-tracing` (e.g. 2.5.0 → 2.6.0), update `simpplr-agents` pin, refresh `__init__` exports. |
+| **6** | Tests | Move `test_llm_request_tracing.py`, `test_tracing_init.py` (and related) into the SDK suite; adjust agents tests to import from the SDK. |
 
 ---
 
-## End-User Extensibility
+## Downstream extensibility
 
 ```mermaid
 graph LR
-  subgraph auto["Automatic (zero code)"]
+  subgraph auto["Automatic"]
     A1["trace_llm root span"]
-    A2["Config fetch span"]
+    A2["Config fetch via trace_external_call"]
     A3["LLM gateway spans"]
   end
 
-  subgraph call["Import and Call"]
-    B1["trace_external_call()\nfor custom external APIs"]
-    B2["build_trace_tags()\nwith custom **kwargs"]
+  subgraph call["Explicit calls"]
+    B1["trace_external_call for non-LLM deps"]
+    B2["build_trace_tags with extra kwargs"]
   end
 
-  subgraph compose["Advanced Composition"]
-    C1["@tracing_agents\n@trace_ai_config\non custom FastAPI routes"]
-    C2["GatewayHttpxClient\nfor non-standard LLM clients"]
+  subgraph compose["Composition"]
+    C1["Decorators on custom FastAPI routes"]
+    C2["GatewayHttpxClient for alternate clients"]
   end
 
   auto --> call --> compose
 ```
 
-**Example** -- tracing a custom vector DB call:
+**Example — external dependency:**
 
 ```python
 from simpplr_tracing import trace_external_call
@@ -172,21 +195,26 @@ with trace_external_call(name="VectorDBSearch", call_type="api", trace_id=ctx.tr
 
 ## Benefits
 
-| Benefit | Detail |
-|---------|--------|
-| No duplication | Single `trace_utils.py`, single `build_trace_tags` format |
-| Lightweight simpplr-agents | ~800 lines of tracing code removed; only thin imports remain |
-| Reusable across services | Any new agent service gets LLM tracing, setup, pipeline decorators from SDK |
-| User extensibility | `trace_external_call`, `GatewayHttpxClient`, pipeline decorators all importable |
-| No circular deps | `set_llm_request_trace_scope` takes kwargs, not `AgentExecutionContext` |
-| Backward compatible | Re-export shims in simpplr-agents; minor SDK version bump (additive API) |
+| Benefit | Description |
+|---------|-------------|
+| Single implementation | One `build_trace_tags` contract and one set of dedup rules. |
+| Smaller agents repo | Large tracing modules removed from simpplr-agents; imports stay stable via shims if needed. |
+| Easier new services | Import tracing, setup, and pipeline helpers from the SDK package set. |
+| Controlled coupling | Keyword-arg scope APIs avoid `simpplr_tracing` ↔ `simpplr_agent_runtime` import cycles. |
+| Additive SDK bump | Prefer minor version with backward-compatible exports. |
 
 ---
 
-## Risks
+## Risks and mitigations
 
 | Risk | Mitigation |
 |------|------------|
-| `build_trace_tags` format change breaks SDK consumers | Check downstream usage; add `format` parameter if needed |
-| `simpplr_tracing` → `simpplr_agent_runtime` circular dep | Refactor to keyword args; no runtime import |
-| Test coverage gap during migration | Move tests alongside code; run both suites in CI |
+| Tag format change breaks consumers | Audit downstream usage before flip; optional `format` parameter or dual-write period if required. |
+| Circular dependencies | Keep LLM scope and setup free of agents-only types; use kwargs and lazy imports where needed. |
+| Coverage gap during moves | Move tests with modules; run SDK and agents CI until both are green. |
+
+---
+
+## Related material
+
+- Detailed task breakdown and file paths: `.cursor/plans/tracing_code_migration_plan_a40d71b2.plan.md`
