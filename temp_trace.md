@@ -162,23 +162,23 @@ gantt
 
 ```mermaid
 graph LR
-  subgraph auto["Automatic"]
+  subgraph layerAuto["Automatic"]
     A1["trace_llm root span"]
     A2["Config fetch via trace_external_call"]
     A3["LLM gateway spans"]
   end
 
-  subgraph call["Explicit calls"]
+  subgraph layerExplicit["Explicit calls"]
     B1["trace_external_call for non-LLM deps"]
     B2["build_trace_tags with extra kwargs"]
   end
 
-  subgraph compose["Composition"]
+  subgraph layerCompose["Composition"]
     C1["Decorators on custom FastAPI routes"]
     C2["GatewayHttpxClient for alternate clients"]
   end
 
-  auto --> call --> compose
+  layerAuto --> layerExplicit --> layerCompose
 ```
 
 **Example — external dependency:**
