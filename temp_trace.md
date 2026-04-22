@@ -215,6 +215,3 @@ with trace_external_call(name="VectorDBSearch", call_type="api", trace_id=ctx.tr
 
 ---
 
-## Related material
-
-- Detailed task breakdown and file paths: `.cursor/plans/tracing_code_migration_plan_a40d71b2.plan.md`
